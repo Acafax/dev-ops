@@ -101,8 +101,10 @@ resource "kubernetes_service" "app_mysql_service" {
     }
 
     port {
+      name = "http"
       protocol = "TCP"
       port = 3306
+      target_port = "http"
     }
 
     cluster_ip = "None"
@@ -135,7 +137,7 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
   }
   spec {
     replicas = 1
-    service_name = "app-mysql-service"
+    service_name = "app-mysql-service" // to bez zmian
 
     selector {
       match_labels = {
@@ -158,7 +160,7 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
             value_from {
               config_map_key_ref {
                 name = kubernetes_config_map.mysql_config_map.metadata[0].name
-                key = "host"
+                key = kubernetes_config_map.mysql_config_map.data.host
               }
             }
           }
@@ -167,21 +169,21 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
             value_from {
               config_map_key_ref {
                 name = kubernetes_config_map.mysql_config_map.metadata[0].name
-                key = "port"
+                key = kubernetes_config_map.mysql_config_map.data.port
               }
             }
           }
           env {
-            name = "MYSQL_DB_NAME"
+            name = "MYSQL_DATABASE"
             value_from {
               config_map_key_ref {
                 name = kubernetes_config_map.mysql_config_map.metadata[0].name
-                key = "name_db"
+                key = kubernetes_config_map.mysql_config_map.data.name_db
               }
             }
           }
           env {
-            name = "MYSQL_PASSWORD"
+            name = "MYSQL_ROOT_PASSWORD"
             value_from {
               secret_key_ref {
                 name = kubernetes_secret_v1.mysql_secret.metadata[0].name
@@ -216,7 +218,7 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
     }
   }
 }
-#
+
 # # Deployment dla Spring Java
  resource "kubernetes_deployment_v1" "spring_deployment" {
    depends_on = [kubernetes_stateful_set.mysql_stateful_set]
@@ -249,31 +251,32 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
          }
          container {
            name  = "spring-app"
-           image = "acafax/spring-docker-app:latest" # NAZWA OBRAZU Ze SPRING
+           image = "acafax/spring-app:latest" # NAZWA OBRAZU Ze SPRING
+
            env {
              name = "MYSQL_HOST"
              value_from {
-               secret_key_ref {
+               config_map_key_ref {
                  name = kubernetes_config_map.mysql_config_map.metadata[0].name
-                 key  = "host"
+                 key  = kubernetes_config_map.mysql_config_map.data.host
                }
              }
            }
            env {
              name = "MYSQL_PORT"
              value_from {
-               secret_key_ref {
+               config_map_key_ref {
                  name = kubernetes_config_map.mysql_config_map.metadata[0].name
-                 key  = "port"
+                 key  = kubernetes_config_map.mysql_config_map.data.port
                }
              }
            }
            env {
              name = "MYSQL_DB_NAME"
              value_from {
-               secret_key_ref {
+               config_map_key_ref {
                name = kubernetes_config_map.mysql_config_map.metadata[0].name
-                 key  = "name_db"
+                 key  = kubernetes_config_map.mysql_config_map.data.name_db
                }
              }
            }
@@ -295,6 +298,9 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
                }
              }
            }
+           command = ["java"]
+           args = ["-jar", "./target/dev-ops-app.jar"]
+
            port {
              container_port = 8080
            }
@@ -303,50 +309,21 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
      }
    }
  }
-# ingres
-# resource "kubernetes_ingress_v1" "web-server-ingress" {
-#   metadata {
-#     name = "web-server-ingress"
-#     namespace = kubernetes_namespace_v1.app-spring.metadata[0].name
-#   }
-#   spec {
-#     ingress_class_name = "nginx"
-#     rule {
-#       host = "web-server.tf.npi-cluster"
-#       http {
-#         path {
-#           path = "/"
-#           path_type = "Prefix"
-#           backend {
-#             service {
-#               name = kubernetes_service_v1.spring-app-service.metadata[0].name
-#               port {
-#                 name = "http"
-#               }
-#             }
-#           }
-#         }
-#       }
-#     }
-#   }
-# }
-#
-#
-#
-# resource "kubernetes_service_v1" "spring-app-service" {
-#   metadata {
-#     name = "spring-app-service"
-#     namespace = kubernetes_namespace_v1.app-spring.metadata[0].name
-#   }
-#   spec {
-#     selector = {
-#       "app" = "spring-app"
-#     }
-#     port {
-#       name = "http"
-#       protocol = "TCP"
-#       port = 80
-#       target_port = "http"
-#     }
-#   }
-# }
+
+resource "kubernetes_service_v1" "spring-app-service" {
+  metadata {
+    name = "spring-app-service"
+    namespace = kubernetes_namespace_v1.app_spring_namespace.metadata[0].name
+  }
+  spec {
+    selector = {
+      "app" = "spring-app"
+    }
+    port {
+      name = "http"
+      protocol = "TCP"
+      port = 80
+      target_port = "http"
+    }
+  }
+}

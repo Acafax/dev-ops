@@ -8,7 +8,7 @@ RUN ls -l /app/target
 #Po dodaniu /app/target poprawnie działa
 FROM eclipse-temurin:23-jre-ubi9-minimal
 COPY --from=base /app/target/dev-ops-app.jar ./target/dev-ops-app.jar
-CMD ["java", "-jar", "./target/dev-ops-app.jar"]
+#CMD ["java", "-jar", "./target/dev-ops-app.jar"]
 
 #
 #
