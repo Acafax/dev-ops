@@ -104,7 +104,7 @@ resource "kubernetes_service" "app_mysql_service" {
       name = "http"
       protocol = "TCP"
       port = 3306
-      target_port = "http"
+      target_port = 3306
     }
 
     cluster_ip = "None"
@@ -160,7 +160,7 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
             value_from {
               config_map_key_ref {
                 name = kubernetes_config_map.mysql_config_map.metadata[0].name
-                key = kubernetes_config_map.mysql_config_map.data.host
+                key = "host"
               }
             }
           }
@@ -169,7 +169,7 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
             value_from {
               config_map_key_ref {
                 name = kubernetes_config_map.mysql_config_map.metadata[0].name
-                key = kubernetes_config_map.mysql_config_map.data.port
+                key = "port"//kubernetes_config_map.mysql_config_map.data.port
               }
             }
           }
@@ -178,7 +178,7 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
             value_from {
               config_map_key_ref {
                 name = kubernetes_config_map.mysql_config_map.metadata[0].name
-                key = kubernetes_config_map.mysql_config_map.data.name_db
+                key = "name_db"//kubernetes_config_map.mysql_config_map.data.name_db
               }
             }
           }
@@ -244,21 +244,16 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
          }
        }
        spec {
-         init_container {
-           name = "czekaj-na-bd"
-           image = "busybox:1.35"
-           command = ["sh", "-c", "until nc -z mysql 3306; do echo czekam na bd; sleep 2; done;"]
-         }
          container {
            name  = "spring-app"
-           image = "acafax/spring-app:latest" # NAZWA OBRAZU Ze SPRING
+           image = "acafax/spring-app:latest" # NAZWA OBRAZU Ze SPRINGA
 
            env {
              name = "MYSQL_HOST"
              value_from {
                config_map_key_ref {
                  name = kubernetes_config_map.mysql_config_map.metadata[0].name
-                 key  = kubernetes_config_map.mysql_config_map.data.host
+                 key  = "host"//kubernetes_config_map.mysql_config_map.data.host
                }
              }
            }
@@ -267,7 +262,7 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
              value_from {
                config_map_key_ref {
                  name = kubernetes_config_map.mysql_config_map.metadata[0].name
-                 key  = kubernetes_config_map.mysql_config_map.data.port
+                 key  = "port"//kubernetes_config_map.mysql_config_map.data.port
                }
              }
            }
@@ -276,7 +271,7 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
              value_from {
                config_map_key_ref {
                name = kubernetes_config_map.mysql_config_map.metadata[0].name
-                 key  = kubernetes_config_map.mysql_config_map.data.name_db
+                 key  = "name_db"//kubernetes_config_map.mysql_config_map.data.name_db
                }
              }
            }
@@ -290,7 +285,7 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
              }
            }
            env {
-             name = "MYSQL_PASSWORD"
+             name = "MYSQL_ROOT_PASSWORD"
              value_from {
                secret_key_ref {
                  name = kubernetes_secret_v1.mysql_secret.metadata[0].name
@@ -323,7 +318,7 @@ resource "kubernetes_service_v1" "spring-app-service" {
       name = "http"
       protocol = "TCP"
       port = 80
-      target_port = "http"
+      target_port = 8080
     }
   }
 }
