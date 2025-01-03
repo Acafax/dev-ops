@@ -90,7 +90,7 @@ resource "kubernetes_service" "app_mysql_service" {
     name = "app-mysql-service"
     namespace = kubernetes_namespace_v1.app_spring_namespace.metadata[0].name
     labels = {
-      app = "mysql-app"
+      app = "mysql"
     }
   }
 
@@ -112,10 +112,10 @@ resource "kubernetes_service" "app_mysql_service" {
 }
 resource "kubernetes_persistent_volume_claim" "mysql_pvc" {
   metadata {
-    name = "mysql-pvc"
+    name = "mysql-pvc" //mysql-pvc
     namespace = kubernetes_namespace_v1.app_spring_namespace.metadata[0].name
     labels = {
-      app = "mysql-app"
+      app = "mysql" //mysql-app
     }
   }
   spec {
@@ -133,6 +133,7 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
     namespace = kubernetes_namespace_v1.app_spring_namespace.metadata[0].name
     labels = {
       app = "mysql"
+      tier = "mysql"
     }
   }
   spec {
@@ -191,6 +192,16 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
               }
             }
           }
+
+          env {
+            name = "MYSQL_PASSWORD"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret_v1.mysql_secret.metadata[0].name
+                key  = "password"
+              }
+            }
+          }
           env {
             name = "MYSQL_USER"
             value_from {
@@ -200,6 +211,8 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
               }
             }
           }
+          # command = ["java"]
+          # args = ["-jar", "./target/dev-ops-app.jar"]
           port {
             container_port = 3306
           }
@@ -218,7 +231,6 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
     }
   }
 }
-
 # # Deployment dla Spring Java
  resource "kubernetes_deployment_v1" "spring_deployment" {
    depends_on = [kubernetes_stateful_set.mysql_stateful_set]
@@ -322,3 +334,17 @@ resource "kubernetes_service_v1" "spring-app-service" {
     }
   }
 }
+
+# resource "kubernetes_ingress_v1" "spring_web_ingress" {
+#   metadata {
+#     name = "spring-web-ingress"
+#     namespace = kubernetes_namespace_v1.app_spring_namespace.metadata[0].name
+#   }
+#   spec {
+#     ingress_class_name = ""
+#
+#
+#   }
+#
+#
+# }
