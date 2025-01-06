@@ -14,7 +14,6 @@ resource "minikube_cluster" "docker" {
     "dashboard"
   ]
 }
-
 provider "kubernetes" {
   host = minikube_cluster.docker.host
 
@@ -33,30 +32,30 @@ resource "kubernetes_namespace_v1" "app_spring_namespace" {
   }
 }
 
-resource "kubernetes_pod_v1" "spring_pod" {
-  metadata {
-    name = "spring-pod"
-    namespace = kubernetes_namespace_v1.app_spring_namespace.metadata[0].name
-  }
-  spec {
-    container {
-      name = "spring-pod"
-      image = "busybox:1.37.0"
-      command = ["/bin/sh", "-c"]
-      args = ["while true; do echo \"hello from busybox\"; sleep 2; done"]
-      resources {
-        requests = {
-          "cpu" = "100m",
-          "memory" = "100Mi"
-        }
-        limits = {
-          "cpu" = "1000m",
-          "memory" = "256Mi"
-        }
-      }
-    }
-  }
-}
+# resource "kubernetes_pod_v1" "spring_pod" {
+#   metadata {
+#     name = "spring-pod"
+#     namespace = kubernetes_namespace_v1.app_spring_namespace.metadata[0].name
+#   }
+#   spec {
+#     container {
+#       name = "spring-pod"
+#       image = "busybox:1.37.0"
+#       command = ["/bin/sh", "-c"]
+#       args = ["while true; do echo \"hello from busybox\"; sleep 2; done"]
+#       resources {
+#         requests = {
+#           "cpu" = "100m",
+#           "memory" = "100Mi"
+#         }
+#         limits = {
+#           "cpu" = "1000m",
+#           "memory" = "256Mi"
+#         }
+#       }
+#     }
+#   }
+# }
 
 #ConfigMapa dla MySQL-a
 resource "kubernetes_config_map" "mysql_config_map" {
@@ -101,10 +100,7 @@ resource "kubernetes_service" "app_mysql_service" {
     }
 
     port {
-      name = "http"
-      protocol = "TCP"
       port = 3306
-      target_port = 3306
     }
 
     cluster_ip = "None"
@@ -193,15 +189,15 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
             }
           }
 
-          env {
-            name = "MYSQL_PASSWORD"
-            value_from {
-              secret_key_ref {
-                name = kubernetes_secret_v1.mysql_secret.metadata[0].name
-                key  = "password"
-              }
-            }
-          }
+          # env {
+          #   name = "MYSQL_PASSWORD"
+          #   value_from {
+          #     secret_key_ref {
+          #       name = kubernetes_secret_v1.mysql_secret.metadata[0].name
+          #       key  = "password"
+          #     }
+          #   }
+          # }
           env {
             name = "MYSQL_USER"
             value_from {
@@ -257,7 +253,7 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
        }
        spec {
          container {
-           name  = "spring-app"
+           name  = "spring-app-deploy"
            image = "acafax/spring-app:latest" # NAZWA OBRAZU Ze SPRINGA
 
            env {
@@ -310,6 +306,7 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
 
            port {
              container_port = 8080
+             name = "http"
            }
          }
        }
@@ -341,10 +338,22 @@ resource "kubernetes_service_v1" "spring-app-service" {
 #     namespace = kubernetes_namespace_v1.app_spring_namespace.metadata[0].name
 #   }
 #   spec {
-#     ingress_class_name = ""
-#
-#
+#     rule {
+#       host = "app-mysql-service" //localhost
+#       http {
+#         path {
+#           path = "/"
+#           path_type = "Prefix"
+#           backend {
+#             service {
+#               name = kubernetes_service_v1.spring-app-service.metadata[0].name
+#               port {
+#                 number = 80
+#               }
+#             }
+#           }
+#         }
+#       }
+#     }
 #   }
-#
-#
 # }
