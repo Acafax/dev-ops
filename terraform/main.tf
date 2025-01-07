@@ -64,54 +64,52 @@ resource "kubernetes_config_map" "mysql_config_map" {
     namespace = kubernetes_namespace_v1.app_spring_namespace.metadata.0.name
   }
   data = {
-    host = "app-mysql-service"
+    mysql-server = "applikacja-mysql-app.app-spring.svc.cluster.local"
     port = "3306"
     name_db = "new_schema"
   }
 }
 
-
-#Secret dla MySQL
-resource "kubernetes_secret_v1" "mysql_secret" {
+resource "kubernetes_secret" "mysql_secret" {
   metadata {
     name      = "mysql-secret-pass"
-    namespace = kubernetes_namespace_v1.app_spring_namespace.metadata[0].name
+    namespace = kubernetes_namespace_v1.app_spring_namespace.metadata.0.name
   }
   data = {
-    username = "cm9vdA=="
-    password = "d2lrdG9y"
+    username = "root"
+    password = "wiktor"
   }
 }
 
-#Serwis dla MYSQLa
 resource "kubernetes_service" "app_mysql_service" {
   metadata {
-    name = "app-mysql-service"
-    namespace = kubernetes_namespace_v1.app_spring_namespace.metadata[0].name
+    name = "applikacja-mysql-app"
+    namespace = kubernetes_namespace_v1.app_spring_namespace.metadata.0.name
     labels = {
-      app = "mysql"
+      app = "applikacja-mysql"
     }
   }
 
   spec {
     selector = {
       app  = kubernetes_stateful_set.mysql_stateful_set.metadata.0.labels.app
-      tier = "mysql"
+      //app  = kubernetes_deployment.mysql_deployment.metadata.0.labels.app
     }
 
     port {
       port = 3306
     }
 
-    cluster_ip = "None"
+    //cluster_ip = "None" // do wywalenia
   }
 }
+
 resource "kubernetes_persistent_volume_claim" "mysql_pvc" {
   metadata {
     name = "mysql-pvc" //mysql-pvc
-    namespace = kubernetes_namespace_v1.app_spring_namespace.metadata[0].name
+    namespace = kubernetes_namespace_v1.app_spring_namespace.metadata.0.name
     labels = {
-      app = "mysql" //mysql-app
+      app = "applikacja-mysql" //mysql-app
     }
   }
   spec {
@@ -123,13 +121,115 @@ resource "kubernetes_persistent_volume_claim" "mysql_pvc" {
     }
   }
 }
+
+# resource "kubernetes_deployment" "mysql_deployment" {
+#   metadata {
+#     name = "applikacja-mysql-app"
+#     namespace = kubernetes_namespace_v1.app_spring_namespace.metadata.0.name
+#     labels = {
+#       app = "applikacja-mysql"
+#     }
+#   }
+#
+#   spec {
+#     selector {
+#       match_labels = {
+#         app = "applikacja-mysql"
+#         tier = "mysql"
+#       }
+#     }
+#     strategy {
+#       type = "Recreate"
+#     }
+#     template {
+#       metadata {
+#         labels = {
+#           app= "applikacja-mysql"
+#           tier = "mysql"
+#         }
+#       }
+#
+#       spec {
+#         container {
+#           name  = "mysql-container"
+#           image = "mysql:8.0.40"
+#
+#           env {
+#             name = "MYSQL_DATABASE"
+#             value_from {
+#               config_map_key_ref {
+#                 key = "name_db"
+#                 name = kubernetes_config_map.mysql_config_map.metadata.0.name
+#               }
+#             }
+#           }
+#
+#           env {
+#             name = "MYSQL_ROOT_PASSWORD"
+#             value_from {
+#               secret_key_ref {
+#                 key = "password"
+#                 name = kubernetes_secret.mysql_secret.metadata.0.name
+#
+#               }
+#             }
+#           }
+#           env {
+#             name = "MYSQL_USER"
+#             value_from {
+#               secret_key_ref {
+#                 key = "username"
+#                 name = kubernetes_secret.mysql_secret.metadata.0.name
+#
+#               }
+#             }
+#           }
+#
+#           env {
+#             name = "MYSQL_PASSWORD"
+#             value_from {
+#               secret_key_ref {
+#                 key = "password"
+#                 name = kubernetes_secret.mysql_secret.metadata.0.name
+#
+#               }
+#             }
+#           }
+#
+#           liveness_probe {
+#             tcp_socket {
+#               port = 3306
+#             }
+#           }
+#           # port {
+#           #   name = "mysql"
+#           #   container_port =0
+#           # }
+#
+#           volume_mount {
+#             name = "mysql-storage"
+#             mount_path = "/var/lib/mysql"
+#           }
+#         }
+#         volume {
+#           name = "mysql-storage"
+#           persistent_volume_claim {
+#             claim_name = kubernetes_persistent_volume_claim.mysql_pvc.metadata.0.name
+#           }
+#         }
+#       }
+#     }
+#   }
+# }
+
+
 resource "kubernetes_stateful_set" "mysql_stateful_set" {
   metadata {
-    name = "mysql-stateful-set"
+    name = "applikacja-mysql-app"
     namespace = kubernetes_namespace_v1.app_spring_namespace.metadata[0].name
     labels = {
-      app = "mysql"
-      tier = "mysql"
+      app = "applikacja-mysql"
+      tier = "baza-danych"
     }
   }
   spec {
@@ -153,16 +253,17 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
           image = "mysql:8.0.40"
 
           env {
-            name = "MYSQL_HOST"
+            name = "MYSQL_HOST" //
             value_from {
               config_map_key_ref {
                 name = kubernetes_config_map.mysql_config_map.metadata[0].name
-                key = "host"
+                key = "mysql-server"
               }
             }
           }
+
           env {
-            name = "MYSQL_PORT"
+            name = "MYSQL_PORT" // dawny HOST
             value_from {
               config_map_key_ref {
                 name = kubernetes_config_map.mysql_config_map.metadata[0].name
@@ -183,7 +284,7 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
             name = "MYSQL_ROOT_PASSWORD"
             value_from {
               secret_key_ref {
-                name = kubernetes_secret_v1.mysql_secret.metadata[0].name
+                name = kubernetes_secret.mysql_secret.metadata[0].name
                 key  = "password"
               }
             }
@@ -202,7 +303,7 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
             name = "MYSQL_USER"
             value_from {
               secret_key_ref {
-                name = kubernetes_secret_v1.mysql_secret.metadata[0].name
+                name = kubernetes_secret.mysql_secret.metadata[0].name
                 key  = "username"
               }
             }
@@ -227,19 +328,42 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
     }
   }
 }
-# # Deployment dla Spring Java
- resource "kubernetes_deployment_v1" "spring_deployment" {
+resource "kubernetes_service" "spring_app_service" {
+
+  depends_on = [kubernetes_deployment.spring_deployment]
+  metadata {
+    name = "aplikacja-spring-app"
+    namespace = kubernetes_namespace_v1.app_spring_namespace.metadata.0.name
+    labels = {
+      app = "spring-app"
+    }
+  }
+  spec {
+    ///type = "NodePort"
+    selector = {
+      app = "spring-app"
+    }
+    port {
+      name = "http"
+      protocol = "TCP"
+      port = 80
+      target_port = "http"
+    }
+  }
+}
+
+ resource "kubernetes_deployment" "spring_deployment" {
    depends_on = [kubernetes_stateful_set.mysql_stateful_set]
+   //depends_on = [kubernetes_deployment.mysql_deployment]
 
    metadata {
-     name      = "spring-app"
-     namespace = kubernetes_namespace_v1.app_spring_namespace.metadata[0].name
+     name      = "aplikacja-spring-app"
+     namespace = kubernetes_namespace_v1.app_spring_namespace.metadata.0.name
      labels = {
-       "app" = "applikacja-spring"
+       "app" = "spring-app"
      }
    }
    spec {
-     replicas = 2
      selector {
        match_labels = {
          app = "spring-app"
@@ -256,81 +380,75 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
            name  = "spring-app-deploy"
            image = "acafax/spring-app:latest" # NAZWA OBRAZU Ze SPRINGA
 
-           env {
-             name = "MYSQL_HOST"
-             value_from {
-               config_map_key_ref {
-                 name = kubernetes_config_map.mysql_config_map.metadata[0].name
-                 key  = "host"//kubernetes_config_map.mysql_config_map.data.host
-               }
+           port {
+             name = "http"
+             container_port = 8080
+           }
+
+           resources {
+             limits = {
+               cpu = 0.2
+               memory = "200Mi"
              }
            }
+
            env {
-             name = "MYSQL_PORT"
-             value_from {
-               config_map_key_ref {
-                 name = kubernetes_config_map.mysql_config_map.metadata[0].name
-                 key  = "port"//kubernetes_config_map.mysql_config_map.data.port
-               }
-             }
-           }
-           env {
-             name = "MYSQL_DB_NAME"
-             value_from {
-               config_map_key_ref {
-               name = kubernetes_config_map.mysql_config_map.metadata[0].name
-                 key  = "name_db"//kubernetes_config_map.mysql_config_map.data.name_db
-               }
-             }
-           }
-           env {
-             name = "MYSQL_USER"
+             name = "DB_PASSWORD"
              value_from {
                secret_key_ref {
-                 name = kubernetes_secret_v1.mysql_secret.metadata[0].name
+                 key  = "password"
+                 name = kubernetes_secret.mysql_secret.metadata.0.name
+
+               }
+             }
+           }
+           env {
+             name = "DB_SERVER"
+             value_from {
+               config_map_key_ref {
+                 key  = "mysql-server"
+                 name = kubernetes_config_map.mysql_config_map.metadata[0].name
+               }
+             }
+           }
+           env {
+             name = "DB_PORT"
+             value_from {
+               config_map_key_ref {
+                 key  = "port"
+                 name = kubernetes_config_map.mysql_config_map.metadata[0].name
+               }
+             }
+           }
+           env {
+             name = "DB_NAME"
+             value_from {
+               config_map_key_ref {
+                 key  = "name_db"
+                 name = kubernetes_config_map.mysql_config_map.metadata[0].name
+               }
+             }
+           }
+           env {
+             name = "DB_USERNAME"
+             value_from {
+               secret_key_ref {
+                 name = kubernetes_secret.mysql_secret.metadata[0].name
                  key  = "username"
                }
              }
            }
-           env {
-             name = "MYSQL_ROOT_PASSWORD"
-             value_from {
-               secret_key_ref {
-                 name = kubernetes_secret_v1.mysql_secret.metadata[0].name
-                 key  = "password"
-               }
-             }
-           }
+
            command = ["java"]
            args = ["-jar", "./target/dev-ops-app.jar"]
-
-           port {
-             container_port = 8080
-             name = "http"
-           }
+         }
+         image_pull_secrets {
+           name = kubernetes_secret.mysql_secret.metadata.0.name
          }
        }
      }
    }
  }
-
-resource "kubernetes_service_v1" "spring-app-service" {
-  metadata {
-    name = "spring-app-service"
-    namespace = kubernetes_namespace_v1.app_spring_namespace.metadata[0].name
-  }
-  spec {
-    selector = {
-      "app" = "spring-app"
-    }
-    port {
-      name = "http"
-      protocol = "TCP"
-      port = 80
-      target_port = 8080
-    }
-  }
-}
 
 # resource "kubernetes_ingress_v1" "spring_web_ingress" {
 #   metadata {
@@ -338,8 +456,9 @@ resource "kubernetes_service_v1" "spring-app-service" {
 #     namespace = kubernetes_namespace_v1.app_spring_namespace.metadata[0].name
 #   }
 #   spec {
+#     ingress_class_name = ""
 #     rule {
-#       host = "app-mysql-service" //localhost
+#       host = "acafax/spring-app:latest" //app-mysql-service /localhost
 #       http {
 #         path {
 #           path = "/"
