@@ -320,3 +320,28 @@ resource "kubernetes_service" "spring_app_service" {
      }
    }
  }
+resource "kubernetes_ingress_v1" "spring_web_ingress" {
+  metadata {
+    name = "spring-web-ingress"
+    namespace = kubernetes_namespace_v1.app_spring_namespace.metadata[0].name
+  }
+  spec {
+    rule {
+      host = "aplikacja-spring-app" //localhost
+      http {
+        path {
+          path = "/"
+          path_type = "Prefix"
+          backend {
+            service {
+              name = kubernetes_service.spring_app_service.metadata.0.name
+              port {
+                number = 8080 // 80 ?
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
