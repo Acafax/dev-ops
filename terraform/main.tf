@@ -129,12 +129,6 @@ resource "kubernetes_stateful_set" "mysql_stateful_set" {
           env {
             name = "DB_SERVER" //
             value = "applikacja-mysql-app.app-spring.svc.cluster.local"
-            # value_from {
-            #   config_map_key_ref {
-            #     name = kubernetes_config_map.mysql_config_map.metadata[0].name
-            #     key = "mysql-server"
-            #   }
-            # }
           }
 
           env {
