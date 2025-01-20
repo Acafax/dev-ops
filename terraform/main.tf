@@ -22,7 +22,6 @@ provider "kubernetes" {
   cluster_ca_certificate = minikube_cluster.docker.cluster_ca_certificate
 }
 
-# Namespace
 resource "kubernetes_namespace_v1" "app_spring_namespace" {
   metadata {
     name = "app-spring"
