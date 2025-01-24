@@ -2,10 +2,6 @@ provider "minikube" {
   kubernetes_version = "v1.25.0"
 }
 
-# Budowanie obrazu w terraform i wgranie go do klastra (temat 2 i 6 na moodle)
-#
-# 2 różne namespaces
-
 resource "minikube_cluster" "docker" {
   driver       = "docker"
   cluster_name = "spring-cluster"
@@ -35,8 +31,15 @@ resource "docker_image" "spring_test" { // TUTAJ TRZEBA TO ZMIENIĆ
     context = "C:/Users/rudyw/IdeaProjects/dev-ops"
     tag = ["spring-app:latest"]
     dockerfile = "Dockerfile"
-    no_cache = true
+    no_cache   = true
   }
+  # name = "spring-app"
+  # build {
+  #   context    = "../" #
+  #   dockerfile = "../Dockerfile"
+  #   tag        = ["spring-app:test"]
+  #   no_cache = true
+  # }
 }
 
 resource "kubernetes_namespace_v1" "app_spring_namespace" {
@@ -294,7 +297,8 @@ resource "kubernetes_service" "spring_app_service" {
        spec {
          container {
            name  = "spring-app-deploy"
-            image = "spring-app:latest"
+            //image = "spring-app:latest"
+            image = docker_image.spring_test.name
 
            port {
              name = "http"
