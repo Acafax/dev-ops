@@ -2,6 +2,10 @@ provider "minikube" {
   kubernetes_version = "v1.25.0"
 }
 
+# Budowanie obrazu w terraform i wgranie go do klastra (temat 2 i 6 na moodle)
+#
+# 2 różne namespaces
+
 resource "minikube_cluster" "docker" {
   driver       = "docker"
   cluster_name = "spring-cluster"
@@ -22,6 +26,19 @@ provider "kubernetes" {
   cluster_ca_certificate = minikube_cluster.docker.cluster_ca_certificate
 }
 
+resource "docker_image" "spring_test" { // TUTAJ TRZEBA TO ZMIENIĆ
+  depends_on = [minikube_cluster.docker]
+  name = "spring-app"
+  build {
+    //context = "../${path.module}"
+    //context = "../"
+    context = "C:/Users/rudyw/IdeaProjects/dev-ops"
+    tag = ["spring-app:latest"]
+    dockerfile = "Dockerfile"
+    no_cache = true
+  }
+}
+
 resource "kubernetes_namespace_v1" "app_spring_namespace" {
   metadata {
     name = "app-spring"
@@ -30,11 +47,19 @@ resource "kubernetes_namespace_v1" "app_spring_namespace" {
     }
   }
 }
-
-
-resource "kubernetes_config_map" "mysql_config_map" {
+resource "kubernetes_namespace_v1" "mysql_namespace" {
   metadata {
-    name = "mysql-config-map"
+    name = "mysql-namespace"
+    labels = {
+      "origin" = "terraform"
+    }
+  }
+}
+
+
+resource "kubernetes_config_map" "mysql_config_map_spring" {
+  metadata {
+    name = "mysql-config-map-spring"
     namespace = kubernetes_namespace_v1.app_spring_namespace.metadata.0.name
   }
   data = {
@@ -43,11 +68,32 @@ resource "kubernetes_config_map" "mysql_config_map" {
     name_db = "new_schema"
   }
 }
+resource "kubernetes_config_map" "mysql_config_map" {
+  metadata {
+    name = "mysql-config-map"
+    namespace = kubernetes_namespace_v1.mysql_namespace.metadata.0.name
+  }
+  data = {
+    mysql-server = "applikacja-mysql-app.app-spring.svc.cluster.local"
+    port = "3306"
+    name_db = "new_schema"
+  }
+}
 
+resource "kubernetes_secret" "mysql_secret_spring" {
+  metadata {
+    name      = "mysql-secret-pass-spring"
+    namespace = kubernetes_namespace_v1.app_spring_namespace.metadata.0.name
+  }
+  data = {
+    username = "user"
+    password = "wiktor"
+  }
+}
 resource "kubernetes_secret" "mysql_secret" {
   metadata {
     name      = "mysql-secret-pass"
-    namespace = kubernetes_namespace_v1.app_spring_namespace.metadata.0.name
+    namespace = kubernetes_namespace_v1.mysql_namespace.metadata.0.name
   }
   data = {
     username = "user"
@@ -58,7 +104,7 @@ resource "kubernetes_secret" "mysql_secret" {
 resource "kubernetes_service" "app_mysql_service" {
   metadata {
     name = "applikacja-mysql-app"
-    namespace = kubernetes_namespace_v1.app_spring_namespace.metadata.0.name
+    namespace = kubernetes_namespace_v1.mysql_namespace.metadata.0.name
     labels = {
       app = "applikacja-mysql"
     }
@@ -81,7 +127,7 @@ resource "kubernetes_service" "app_mysql_service" {
 resource "kubernetes_persistent_volume_claim" "mysql_pvc" {
   metadata {
     name = "mysql-pvc" //mysql-pvc
-    namespace = kubernetes_namespace_v1.app_spring_namespace.metadata.0.name
+    namespace = kubernetes_namespace_v1.mysql_namespace.metadata.0.name
     labels = {
       app = "applikacja-mysql" //mysql-app
     }
@@ -99,7 +145,7 @@ resource "kubernetes_persistent_volume_claim" "mysql_pvc" {
 resource "kubernetes_stateful_set" "mysql_stateful_set" {
   metadata {
     name = "applikacja-mysql-app"
-    namespace = kubernetes_namespace_v1.app_spring_namespace.metadata[0].name
+    namespace = kubernetes_namespace_v1.mysql_namespace.metadata[0].name
     labels = {
       app = "applikacja-mysql"
       tier = "baza-danych"
@@ -248,7 +294,7 @@ resource "kubernetes_service" "spring_app_service" {
        spec {
          container {
            name  = "spring-app-deploy"
-           image = "acafax/spring-app:latest" # NAZWA OBRAZU Ze SPRINGA
+            image = "spring-app:latest"
 
            port {
              name = "http"
@@ -267,7 +313,7 @@ resource "kubernetes_service" "spring_app_service" {
              value_from {
                secret_key_ref {
                  key  = "password"
-                 name = kubernetes_secret.mysql_secret.metadata.0.name
+                 name = kubernetes_secret.mysql_secret_spring.metadata.0.name
 
                }
              }
@@ -277,7 +323,7 @@ resource "kubernetes_service" "spring_app_service" {
              value_from {
                config_map_key_ref {
                  key  = "mysql-server"
-                 name = kubernetes_config_map.mysql_config_map.metadata[0].name
+                 name = kubernetes_config_map.mysql_config_map_spring.metadata[0].name
                }
              }
            }
@@ -286,7 +332,7 @@ resource "kubernetes_service" "spring_app_service" {
              value_from {
                config_map_key_ref {
                  key  = "port"
-                 name = kubernetes_config_map.mysql_config_map.metadata[0].name
+                 name = kubernetes_config_map.mysql_config_map_spring.metadata[0].name
                }
              }
            }
@@ -295,7 +341,7 @@ resource "kubernetes_service" "spring_app_service" {
              value_from {
                config_map_key_ref {
                  key  = "name_db"
-                 name = kubernetes_config_map.mysql_config_map.metadata[0].name
+                 name = kubernetes_config_map.mysql_config_map_spring.metadata[0].name
                }
              }
            }
@@ -303,7 +349,7 @@ resource "kubernetes_service" "spring_app_service" {
              name = "DB_USERNAME"
              value_from {
                secret_key_ref {
-                 name = kubernetes_secret.mysql_secret.metadata[0].name
+                 name = kubernetes_secret.mysql_secret_spring.metadata[0].name
                  key  = "username"
                }
              }
@@ -313,7 +359,7 @@ resource "kubernetes_service" "spring_app_service" {
            args = ["-jar", "./target/dev-ops-app.jar"]
          }
          image_pull_secrets {
-           name = kubernetes_secret.mysql_secret.metadata.0.name
+           name = kubernetes_secret.mysql_secret_spring.metadata.0.name
          }
        }
      }
