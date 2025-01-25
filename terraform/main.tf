@@ -21,25 +21,28 @@ provider "kubernetes" {
   client_key             = minikube_cluster.docker.client_key
   cluster_ca_certificate = minikube_cluster.docker.cluster_ca_certificate
 }
+provider "docker" {
 
-resource "docker_image" "spring_test" { // TUTAJ TRZEBA TO ZMIENIĆ
-  depends_on = [minikube_cluster.docker]
+}
+
+resource "docker_image" "spring_test" {
+  //depends_on = [minikube_cluster.docker]
   name = "spring-app"
   build {
-    //context = "../${path.module}"
-    //context = "../"
-    context = "C:/Users/rudyw/IdeaProjects/dev-ops"
+    context = "./.."
     tag = ["spring-app:latest"]
     dockerfile = "Dockerfile"
     no_cache   = true
   }
-  # name = "spring-app"
-  # build {
-  #   context    = "../" #
-  #   dockerfile = "../Dockerfile"
-  #   tag        = ["spring-app:test"]
-  #   no_cache = true
-  # }
+}
+
+resource "null_resource" "push_image_spring" {
+  triggers = {image_id = docker_image.spring_test.image_id}
+
+  provisioner "local-exec" {
+    command = "minikube -p ${minikube_cluster.docker.cluster_name} image load ${docker_image.spring_test.name}"
+  }
+  depends_on = [minikube_cluster.docker]
 }
 
 resource "kubernetes_namespace_v1" "app_spring_namespace" {
@@ -59,6 +62,33 @@ resource "kubernetes_namespace_v1" "mysql_namespace" {
   }
 }
 
+resource "kubernetes_cron_job_v1" "corn_job" {
+
+ metadata {
+   name = "cron-job"
+   namespace = kubernetes_namespace_v1.mysql_namespace.metadata.0.name
+ }
+  spec {
+    schedule = "* * * * *"
+    job_template {
+      metadata {}
+      spec {
+        template {
+          metadata {}
+          spec {
+            container {
+              name = "jedz-kukurydze"
+              image = "busybox:1.28"
+              image_pull_policy = "IfNotPresent"
+              command = ["/bin/sh", "-c", "date; echo 'Jedz Kukurydze i pij wode!'; sleep 10"]
+            }
+            restart_policy = "OnFailure"
+          }
+        }
+      }
+    }
+  }
+}
 
 resource "kubernetes_config_map" "mysql_config_map_spring" {
   metadata {
